@@ -1,0 +1,39 @@
+{% extends "library/base.html" %}
+{% block title %}Recommendations{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Recommend Me a Book</h2>
+
+{% if not recommendations %}
+    <p>You don’t have any personalised recommendations yet.
+       Borrow a few books first so the system learns your taste.</p>
+{% else %}
+    <div class="row g-4">
+        {% for rec in recommendations %}
+            {% with book=rec.book %}
+            <div class="col-md-4 col-lg-3">
+                <div class="card book-card h-100 text-center">
+                    {% if book.cover %}
+                        <img src="{{ book.cover.url }}" class="card-img-top" alt="{{ book.title }}">
+                    {% endif %}
+                    <div class="card-body">
+                        <h6 class="card-title">{{ book.title }}</h6>
+                        <p class="card-text text-muted mb-1">
+                            {{ book.genre.name }}{% if book.author %} · {{ book.author }}{% endif %}
+                        </p>
+                        <div class="match-pill mb-2">
+                            {{ rec.match_percent }}% match
+                        </div>
+                        <div class="match-bar mb-2">
+                            <div class="match-bar-inner" style="width: {{ rec.match_percent }}%;"></div>
+                        </div>
+                        <a href="{% url 'library:borrow_book' book.pk %}"
+                           class="btn btn-primary btn-sm">Borrow</a>
+                    </div>
+                </div>
+            </div>
+            {% endwith %}
+        {% endfor %}
+    </div>
+{% endif %}
+{% endblock %}

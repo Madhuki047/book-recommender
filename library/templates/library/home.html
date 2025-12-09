@@ -1,0 +1,59 @@
+{% extends "library/base.html" %}
+{% block title %}Home - Bookstore{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Welcome to MR Mad Bookstore</h1>
+
+<h4>Genres</h4>
+<div class="mb-4">
+    {% for genre in genres %}
+        <button class="btn btn-outline-primary btn-sm me-2 mb-2">
+            {{ genre.name }}
+        </button>
+    {% empty %}
+        <p>No genres yet.</p>
+    {% endfor %}
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Latest Books</h4>
+    {% if user.is_authenticated %}
+        <a href="{% url 'library:recommendations' %}" class="btn btn-primary btn-sm">
+            Find Recommendations
+        </a>
+    {% endif %}
+</div>
+
+<div class="row g-3">
+    {% for book in latest_books %}
+        <div class="col-md-4 col-lg-3">
+            <div class="card book-card h-100">
+                {% if book.cover %}
+                    <img src="{{ book.cover.url }}" class="card-img-top" alt="{{ book.title }}">
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ book.title }}</h5>
+                    <p class="card-text text-muted mb-1">
+                        {{ book.genre.name }}{% if book.author %} · {{ book.author }}{% endif %}
+                    </p>
+                    <p class="card-text small text-truncate">
+                        {{ book.description|default:"No description." }}
+                    </p>
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'library:borrow_book' book.pk %}"
+                           class="btn btn-primary btn-sm">Borrow</a>
+                        <a href="{% url 'library:return_book' book.pk %}"
+                           class="btn btn-outline-secondary btn-sm ms-2">Return</a>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="btn btn-outline-secondary btn-sm">
+                            Login to borrow
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <p>No books yet.</p>
+    {% endfor %}
+</div>
+{% endblock %}
