@@ -6,17 +6,28 @@
 
 <h4>Genres</h4>
 <div class="mb-4">
+    <a href="{% url 'library:home' %}"
+       class="btn btn-{% if not selected_genre %}primary{% else %}outline-primary{% endif %} btn-sm me-2 mb-2">
+        All
+    </a>
     {% for genre in genres %}
-        <button class="btn btn-outline-primary btn-sm me-2 mb-2">
+        <a href="?genre={{ genre.slug }}"
+           class="btn btn-{% if selected_genre and genre.id == selected_genre.id %}primary{% else %}outline-primary{% endif %} btn-sm me-2 mb-2">
             {{ genre.name }}
-        </button>
+        </a>
     {% empty %}
         <p>No genres yet.</p>
     {% endfor %}
 </div>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4 class="mb-0">Latest Books</h4>
+    <h4 class="mb-0">
+        {% if selected_genre %}
+            Books in {{ selected_genre.name }}
+        {% else %}
+            All Books
+        {% endif %}
+    </h4>
     {% if user.is_authenticated %}
         <a href="{% url 'library:recommendations' %}" class="btn btn-primary btn-sm">
             Find Recommendations
@@ -39,15 +50,37 @@
                     <p class="card-text small text-truncate">
                         {{ book.description|default:"No description." }}
                     </p>
+
                     {% if user.is_authenticated %}
-                        <a href="{% url 'library:borrow_book' book.pk %}"
-                           class="btn btn-primary btn-sm">Borrow</a>
-                        <a href="{% url 'library:return_book' book.pk %}"
-                           class="btn btn-outline-secondary btn-sm ms-2">Return</a>
+                        {% if book.id in borrowed_ids %}
+                            <button class="btn btn-secondary btn-sm" disabled>Borrowed</button>
+                            <button type="button"
+                                    class="btn btn-outline-danger btn-sm ms-2"
+                                    onclick="openRatingModal({{ book.pk }})">
+                                Return
+                            </button>
+                        {% else %}
+                            <a href="{% url 'library:borrow_book' book.pk %}"
+                               class="btn btn-primary btn-sm">Borrow</a>
+                        {% endif %}
                     {% else %}
                         <a href="{% url 'login' %}" class="btn btn-outline-secondary btn-sm">
                             Login to borrow
                         </a>
+                    {% endif %}
+
+                    {% if user.is_authenticated and book.user_rating %}
+                        <div class="mt-2 small">
+                            Your rating:
+                            {% for i in "12345" %}
+                                {% if forloop.counter <= book.user_rating %}
+                                    ⭐
+                                {% else %}
+                                    ☆
+                                {% endif %}
+                            {% endfor %}
+                            ({{ book.user_rating }}/5)
+                        </div>
                     {% endif %}
                 </div>
             </div>
@@ -56,4 +89,60 @@
         <p>No books yet.</p>
     {% endfor %}
 </div>
+
+<!-- Rating Modal -->
+<div class="modal fade" id="ratingModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'library:rate_and_return_book' %}">
+        {% csrf_token %}
+        <input type="hidden" name="book_id" id="ratingBookId">
+
+        <div class="modal-header">
+          <h5 class="modal-title">Rate this book</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"
+                  aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <p class="mb-2">How much did you enjoy this book?</p>
+          <div class="d-flex justify-content-between">
+            <button type="submit" name="rating" value="1" class="btn btn-light flex-fill mx-1">
+              😭
+            </button>
+            <button type="submit" name="rating" value="2" class="btn btn-light flex-fill mx-1">
+              😐
+            </button>
+            <button type="submit" name="rating" value="3" class="btn btn-light flex-fill mx-1">
+              🤔
+            </button>
+            <button type="submit" name="rating" value="4" class="btn btn-light flex-fill mx-1">
+              😊
+            </button>
+            <button type="submit" name="rating" value="5" class="btn btn-light flex-fill mx-1">
+              🤩
+            </button>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <small class="text-muted">
+            Your rating will be used to improve future recommendations.
+          </small>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  function openRatingModal(bookId) {
+    var input = document.getElementById('ratingBookId');
+    input.value = bookId;
+    var modalElement = document.getElementById('ratingModal');
+    var modal = new bootstrap.Modal(modalElement);
+    modal.show();
+  }
+</script>
+
 {% endblock %}

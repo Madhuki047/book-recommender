@@ -29,14 +29,12 @@ class Book(models.Model):
 class Borrow(models.Model):
     """
     Represents a user interacting with a book.
-
-    For the recommender we treat 'rating' as strength of preference:
-    1–5, default 5 when they borrow.
+    For now this is mainly for the recommender later.
     """
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     book = models.ForeignKey(Book, on_delete=models.CASCADE)
-    rating = models.PositiveSmallIntegerField(default=5)
-    active = models.BooleanField(default=True)  # active = currently borrowed
+    rating = models.PositiveSmallIntegerField(default=0)
+    active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -45,11 +43,3 @@ class Borrow(models.Model):
 
     def __str__(self):
         return f"{self.user} → {self.book} ({self.rating})"
-
-
-class UserProfile(models.Model):
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    favourite_genres = models.ManyToManyField(Genre, blank=True)
-
-    def __str__(self):
-        return f"Profile({self.user.username})"

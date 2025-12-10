@@ -1,24 +1,22 @@
-from src.data.ratings_repository import RatingsRepository
-from src.recommender.engine import RecommenderEngine
+from typing import Dict, List
+
 from .models import Borrow, Book
+from core.engine import RecommenderEngine
 
 
-def build_ratings_from_db() -> RatingsRepository:
-    """
-    Build a RatingsRepository from Borrow records in the DB.
+def build_ratings() -> Dict[str, Dict[str, float]]:
+    ratings: Dict[str, Dict[str, float]] = {}
 
-    ratings[user_id][book_id] = rating
-    user_id = username, book_id = Book.pk as string.
-    """
-    repo = RatingsRepository()
-    qs = Borrow.objects.all()
+    for borrow in Borrow.objects.filter(rating__gt=0):
+        user = borrow.user.username
+        book = str(borrow.book_id)
+        rating = float(borrow.rating)
 
-    for borrow in qs:
-        user_id = borrow.user.username
-        book_id = str(borrow.book_id)
-        repo.add_rating(user_id, book_id, borrow.rating)
+        if user not in ratings:
+            ratings[user] = {}
+        ratings[user][book] = rating
 
-    return repo
+    return ratings
 
 
 def get_recommendations_for_user(
@@ -26,42 +24,69 @@ def get_recommendations_for_user(
     metric: str = "cosine",
     k_neighbours: int | None = None,
     max_results: int = 12,
-):
-    """
-    Uses your CF engine from src/ to get recommendations for a Django user.
-    Returns a list of dicts: {"book": Book, "score": float, "match_percent": float}
-    """
-    repo = build_ratings_from_db()
-    engine = RecommenderEngine(repo)
-
+) -> List[dict]:
+    ratings = build_ratings()
     user_id = user.username
 
-    recs = engine.recommend_for_user(
+    if user_id not in ratings:
+        return []
+
+    engine = RecommenderEngine(ratings)
+    raw_recs = engine.recommend_for_user(
         target_user=user_id,
         metric=metric,
         k_neighbours=k_neighbours,
         max_results=max_results,
     )
 
-    if not recs:
+    if not raw_recs:
         return []
 
-    max_score = max(score for _, score in recs)
-    results = []
-
-    for book_id_str, score in recs:
+    # Exclude any book this user has EVER borrowed (active or past)
+    seen_ids = set(
+        Borrow.objects.filter(user=user).values_list("book_id", flat=True)
+    )
+    filtered = []
+    for book_id_str, score in raw_recs:
         try:
-            book = Book.objects.get(pk=int(book_id_str))
-        except (Book.DoesNotExist, ValueError):
+            book_id_int = int(book_id_str)
+        except ValueError:
+            continue
+        if book_id_int in seen_ids:
+            continue
+        filtered.append((book_id_int, score))
+
+    if not filtered:
+        return []
+
+    scores = [s for _, s in filtered]
+    max_score = max(scores)
+    min_score = min(scores)
+
+    results: List[dict] = []
+
+    for idx, (book_id, score) in enumerate(filtered):
+        try:
+            book = Book.objects.get(pk=book_id)
+        except Book.DoesNotExist:
             continue
 
-        match_percent = (score / max_score) * 100.0 if max_score > 0 else 0.0
+        # If scores differ, normalise properly
+        if max_score > min_score:
+            pct = 60.0 + 40.0 * (score - min_score) / (max_score - min_score)
+        else:
+            # All scores equal → spread by rank between 100 and 60
+            n = len(filtered)
+            if n == 1:
+                pct = 100.0
+            else:
+                pct = 100.0 - (idx / (n - 1)) * 40.0
 
         results.append(
             {
                 "book": book,
                 "score": score,
-                "match_percent": round(match_percent, 1),
+                "match_percent": round(pct, 1),
             }
         )
 

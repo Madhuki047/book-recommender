@@ -1,39 +1,95 @@
 {% extends "library/base.html" %}
-{% block title %}Recommendations{% endblock %}
+{% block title %}Recommendations - Bookstore{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Recommend Me a Book</h2>
+<h1 class="mb-4">Recommendations for you</h1>
 
-{% if not recommendations %}
-    <p>You don’t have any personalised recommendations yet.
-       Borrow a few books first so the system learns your taste.</p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <span class="badge bg-primary me-2">Metric: {{ metric|default:"cosine" }}</span>
+        {% if k_value %}
+            <span class="badge bg-secondary">k = {{ k_value }}</span>
+        {% else %}
+            <span class="badge bg-secondary">k = all neighbours</span>
+        {% endif %}
+    </div>
+    <a href="{% url 'library:home' %}" class="btn btn-outline-secondary btn-sm">
+        ← Back to Home
+    </a>
+</div>
+
+{% if grouped_recs %}
+    <h4 class="mb-3">New recommendations</h4>
+
+    {% for group in grouped_recs %}
+        <h5 class="mt-3 mb-2">{{ group.genre.name }}</h5>
+        <div class="row g-3 mb-2">
+            {% for rec in group.items %}
+                {% with book=rec.book %}
+                <div class="col-md-4 col-lg-3">
+                    <div class="card book-card h-100">
+                        {% if book.cover %}
+                            <img src="{{ book.cover.url }}" class="card-img-top" alt="{{ book.title }}">
+                        {% endif %}
+                        <div class="card-body">
+                            <h5 class="card-title">{{ book.title }}</h5>
+                            <p class="card-text text-muted mb-1">
+                                {{ book.genre.name }}{% if book.author %} · {{ book.author }}{% endif %}
+                            </p>
+                            <p class="card-text small text-truncate">
+                                {{ book.description|default:"No description." }}
+                            </p>
+                            <div class="mt-2 small text-muted">
+                                {{ rec.match_percent }}% match
+                            </div>
+                            <div class="progress mt-1" style="height: 6px;">
+                                <div class="progress-bar" role="progressbar"
+                                     style="width: {{ rec.match_percent }}%;"
+                                     aria-valuenow="{{ rec.match_percent }}" aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <a href="{% url 'library:borrow_book' book.pk %}"
+                                   class="btn btn-primary btn-sm">Borrow</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endwith %}
+            {% endfor %}
+        </div>
+        <hr class="my-2">
+    {% endfor %}
 {% else %}
-    <div class="row g-4">
-        {% for rec in recommendations %}
-            {% with book=rec.book %}
+    <p>You don't have any new personalised recommendations yet. Try borrowing and rating a few books!</p>
+{% endif %}
+
+{% if history_books %}
+    <h4 class="mt-4 mb-3">Borrow again</h4>
+    <div class="row g-3">
+        {% for book in history_books %}
             <div class="col-md-4 col-lg-3">
-                <div class="card book-card h-100 text-center">
+                <div class="card book-card h-100">
                     {% if book.cover %}
                         <img src="{{ book.cover.url }}" class="card-img-top" alt="{{ book.title }}">
                     {% endif %}
                     <div class="card-body">
-                        <h6 class="card-title">{{ book.title }}</h6>
+                        <h5 class="card-title">{{ book.title }}</h5>
                         <p class="card-text text-muted mb-1">
                             {{ book.genre.name }}{% if book.author %} · {{ book.author }}{% endif %}
                         </p>
-                        <div class="match-pill mb-2">
-                            {{ rec.match_percent }}% match
+                        <p class="card-text small text-truncate">
+                            {{ book.description|default:"No description." }}
+                        </p>
+                        <div class="mt-3">
+                            <a href="{% url 'library:borrow_book' book.pk %}"
+                               class="btn btn-outline-primary btn-sm">Borrow again</a>
                         </div>
-                        <div class="match-bar mb-2">
-                            <div class="match-bar-inner" style="width: {{ rec.match_percent }}%;"></div>
-                        </div>
-                        <a href="{% url 'library:borrow_book' book.pk %}"
-                           class="btn btn-primary btn-sm">Borrow</a>
                     </div>
                 </div>
             </div>
-            {% endwith %}
         {% endfor %}
     </div>
 {% endif %}
+
 {% endblock %}
