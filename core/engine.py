@@ -114,3 +114,15 @@ class RecommenderEngine:
 
         ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         return ranked[:max_results]
+
+
+    def user_similarity(self, user1: str, user2: str, metric: str = "cosine") -> float:
+        """
+        Wraps calls to the standalone similarity functions.
+        """
+        if metric == "cosine":
+            return cosine_similarity(self.ratings, user1, user2)
+        elif metric == "jaccard":
+            return jaccard_similarity(self.ratings, user1, user2)
+        else:
+            raise ValueError(f"Unknown similarity metric: {metric}")

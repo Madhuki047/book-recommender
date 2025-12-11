@@ -7,6 +7,8 @@ urlpatterns = [
     path("", views.home, name="home"),
     path("books/<int:pk>/borrow/", views.borrow_book, name="borrow_book"),
     path("books/<int:pk>/return/", views.return_book, name="return_book"),
-    path("books/rate-return/", views.rate_and_return_book, name="rate_and_return_book"),  # NEW
+    path("books/rate-return/", views.rate_and_return_book, name="rate_and_return_book"),
     path("recommendations/", views.recommendations, name="recommendations"),
+    path("algorithm-insights/", views.algorithm_insights, name="algorithm_insights"),
+    path("borrowed/", views.borrowed_items, name="borrowed_items"),
 ]

@@ -2,94 +2,142 @@
 {% block title %}Recommendations - Bookstore{% endblock %}
 
 {% block content %}
-<h1 class="mb-4">Recommendations for you</h1>
 
+<!-- Title + back button -->
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-        <span class="badge bg-primary me-2">Metric: {{ metric|default:"cosine" }}</span>
-        {% if k_value %}
-            <span class="badge bg-secondary">k = {{ k_value }}</span>
-        {% else %}
-            <span class="badge bg-secondary">k = all neighbours</span>
-        {% endif %}
-    </div>
+    <h1 class="mb-0">Recommendations for you</h1>
     <a href="{% url 'library:home' %}" class="btn btn-outline-secondary btn-sm">
         ← Back to Home
     </a>
 </div>
 
-{% if grouped_recs %}
-    <h4 class="mb-3">New recommendations</h4>
+<!-- Metric + k-neighbours controls -->
+<div class="d-flex align-items-center gap-3 mb-3">
 
-    {% for group in grouped_recs %}
-        <h5 class="mt-3 mb-2">{{ group.genre.name }}</h5>
-        <div class="row g-3 mb-2">
-            {% for rec in group.items %}
-                {% with book=rec.book %}
-                <div class="col-md-4 col-lg-3">
-                    <div class="card book-card h-100">
-                        {% if book.cover %}
-                            <img src="{{ book.cover.url }}" class="card-img-top" alt="{{ book.title }}">
-                        {% endif %}
-                        <div class="card-body">
-                            <h5 class="card-title">{{ book.title }}</h5>
-                            <p class="card-text text-muted mb-1">
-                                {{ book.genre.name }}{% if book.author %} · {{ book.author }}{% endif %}
-                            </p>
-                            <p class="card-text small text-truncate">
-                                {{ book.description|default:"No description." }}
-                            </p>
-                            <div class="mt-2 small text-muted">
-                                {{ rec.match_percent }}% match
-                            </div>
-                            <div class="progress mt-1" style="height: 6px;">
-                                <div class="progress-bar" role="progressbar"
-                                     style="width: {{ rec.match_percent }}%;"
-                                     aria-valuenow="{{ rec.match_percent }}" aria-valuemin="0" aria-valuemax="100">
-                                </div>
-                            </div>
-                            <div class="mt-3">
-                                <a href="{% url 'library:borrow_book' book.pk %}"
-                                   class="btn btn-primary btn-sm">Borrow</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endwith %}
-            {% endfor %}
-        </div>
-        <hr class="my-2">
-    {% endfor %}
-{% else %}
-    <p>You don't have any new personalised recommendations yet. Try borrowing and rating a few books!</p>
-{% endif %}
+    <!-- Similarity metric badge -->
+    <span class="badge bg-primary">Metric: {{ metric }}</span>
 
-{% if history_books %}
-    <h4 class="mt-4 mb-3">Borrow again</h4>
-    <div class="row g-3">
-        {% for book in history_books %}
-            <div class="col-md-4 col-lg-3">
-                <div class="card book-card h-100">
-                    {% if book.cover %}
-                        <img src="{{ book.cover.url }}" class="card-img-top" alt="{{ book.title }}">
-                    {% endif %}
-                    <div class="card-body">
-                        <h5 class="card-title">{{ book.title }}</h5>
-                        <p class="card-text text-muted mb-1">
-                            {{ book.genre.name }}{% if book.author %} · {{ book.author }}{% endif %}
-                        </p>
-                        <p class="card-text small text-truncate">
-                            {{ book.description|default:"No description." }}
-                        </p>
-                        <div class="mt-3">
-                            <a href="{% url 'library:borrow_book' book.pk %}"
-                               class="btn btn-outline-primary btn-sm">Borrow again</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        {% endfor %}
+    <!-- Neighbourhood size dropdown (k neighbours) -->
+    <div class="dropdown">
+        <button class="btn btn-outline-dark btn-sm dropdown-toggle"
+                type="button"
+                id="kMenu"
+                data-bs-toggle="dropdown"
+                aria-expanded="false">
+            {% if k_value %}
+                {% if k_value == 1 %}
+                    Most similar user (k = 1)
+                {% else %}
+                    Top {{ k_value }} users (k = {{ k_value }})
+                {% endif %}
+            {% else %}
+                Widest pool (all users, k = all)
+            {% endif %}
+        </button>
+
+        <ul class="dropdown-menu" aria-labelledby="kMenu">
+            <li>
+                <a class="dropdown-item k-option" href="?metric={{ metric }}&k=">
+                    Widest pool (all users) <small class="text-muted">(k = all)</small>
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item k-option" href="?metric={{ metric }}&k=10">
+                    Top 10 similar users <small class="text-muted">(k = 10)</small>
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item k-option" href="?metric={{ metric }}&k=5">
+                    Top 5 similar users <small class="text-muted">(k = 5)</small>
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item k-option" href="?metric={{ metric }}&k=3">
+                    Top 3 similar users <small class="text-muted">(k = 3)</small>
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item k-option" href="?metric={{ metric }}&k=2">
+                    Top 2 similar users <small class="text-muted">(k = 2)</small>
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item k-option" href="?metric={{ metric }}&k=1">
+                    Most similar user only <small class="text-muted">(k = 1)</small>
+                </a>
+            </li>
+        </ul>
     </div>
-{% endif %}
+
+    <!-- Tooltip explanation -->
+    <span class="text-muted small"
+          data-bs-toggle="tooltip"
+          title="Neighbourhood size controls how many similar users the algorithm looks at. Smaller = more personalised, larger = broader suggestions.">
+        <i class="bi bi-info-circle"></i> What is this?
+    </span>
+
+    <!-- Tiny spinner shown while AJAX reloads -->
+    <div id="k-spinner" class="spinner-border spinner-border-sm text-secondary d-none ms-2" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+</div>
+
+<!-- Container that will be replaced via AJAX -->
+<div id="recs-container">
+    {% include "library/_recommendations_partial.html" %}
+</div>
+
+<!-- AJAX script to update recommendations when k changes -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Enable Bootstrap tooltips (if not already done in base.html)
+    if (window.bootstrap && bootstrap.Tooltip) {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+            new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    }
+
+    const container = document.getElementById('recs-container');
+    const spinner = document.getElementById('k-spinner');
+    const kButton = document.getElementById('kMenu');
+    const kLinks = document.querySelectorAll('.dropdown-item.k-option');
+
+    if (!container) return;
+
+    kLinks.forEach(function (link) {
+        link.addEventListener('click', function (e) {
+            e.preventDefault();
+
+            // Build URL and add partial=1 so view returns only the fragment
+            const url = new URL(this.href, window.location.origin);
+            url.searchParams.set('partial', '1');
+
+            const labelHtml = this.innerHTML; // to update button text later
+
+            // Simple fade + spinner
+            container.style.opacity = '0.4';
+            if (spinner) spinner.classList.remove('d-none');
+
+            fetch(url)
+                .then(function (response) { return response.text(); })
+                .then(function (html) {
+                    container.innerHTML = html;
+                    // Update button label to match chosen option
+                    if (kButton) {
+                        kButton.innerHTML = labelHtml;
+                    }
+                })
+                .catch(function (err) {
+                    console.error('Error loading recommendations:', err);
+                })
+                .finally(function () {
+                    container.style.opacity = '1';
+                    if (spinner) spinner.classList.add('d-none');
+                });
+        });
+    });
+});
+</script>
 
 {% endblock %}

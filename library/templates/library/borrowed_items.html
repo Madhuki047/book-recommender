@@ -1,0 +1,56 @@
+{% extends "library/base.html" %}
+{% block title %}Borrowed books - Bookstore{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Your borrowed books</h1>
+    <a href="{% url 'library:home' %}" class="btn btn-outline-secondary btn-sm">
+        ← Back to Home
+    </a>
+</div>
+
+{% if borrows %}
+    <div class="row g-3">
+        {% for b in borrows %}
+            {% with book=b.book %}
+            <div class="col-md-4 col-lg-3">
+                <div class="card book-card h-100">
+                    {% if book.cover %}
+                        <img src="{{ book.cover.url }}" class="card-img-top" alt="{{ book.title }}">
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title">{{ book.title }}</h5>
+                        <p class="card-text text-muted mb-1">
+                            {{ book.genre.name }}{% if book.author %} · {{ book.author }}{% endif %}
+                        </p>
+
+                        <p class="small mb-1">
+                            Borrowed on: {{ b.created_at|date:"M d, Y" }}
+                        </p>
+
+                        {% if b.rating > 0 %}
+                            <p class="small mb-1">
+                                Your rating:
+                                {% for i in "12345" %}
+                                    {% if forloop.counter <= b.rating %}⭐{% else %}☆{% endif %}
+                                {% endfor %}
+                                ({{ b.rating }}/5)
+                            </p>
+                        {% endif %}
+
+                        <!-- Optional: simple hint on how to return -->
+                        <p class="text-muted small mt-2">
+                            To return a book, go to the home page and use the red “Return” button with rating.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endwith %}
+        {% endfor %}
+    </div>
+{% else %}
+    <p>You don't have any books currently borrowed.</p>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,352 @@
+{% extends "library/base.html" %}
+{% block title %}Algorithm Insights - Bookstore{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Algorithm Insights</h1>
+    <a href="{% url 'library:home' %}" class="btn btn-outline-secondary btn-sm">
+        ← Back to Home
+    </a>
+</div>
+
+
+<h4>Dataset summary</h4>
+<ul>
+    <li><strong>Users with ratings:</strong> {{ num_users }}</li>
+    <li><strong>Distinct books rated:</strong> {{ num_books }}</li>
+    <li><strong>Total rating entries:</strong> {{ num_ratings }}</li>
+</ul>
+
+<p class="text-muted">
+    The collaborative filtering algorithm works on a user–book rating matrix of size
+    <code>users × books</code>. Time complexity for a single recommendation call is roughly
+    <code>O(U × I)</code> over the active ratings for the chosen user, where U is the number
+    of neighbours examined and I is the number of items they have rated.
+</p>
+
+<hr>
+
+<h4>Ratings dictionary view</h4>
+<p class="text-muted">
+    Below is a compact view of the <code>ratings</code> dictionary:
+    each row shows a user and the books they have rated (book id → rating).
+</p>
+
+{% if ratings_rows %}
+    <table class="table table-sm table-striped align-middle mb-4">
+        <thead>
+            <tr>
+                <th>User</th>
+                <th>Ratings (book_id → rating)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in ratings_rows %}
+                <tr>
+                    <td>{{ row.user }}</td>
+                    <td>
+                        {% for book_id, rating in row.pairs %}
+                            <span class="badge bg-light text-dark me-1 mb-1">
+                                {{ book_id }} → {{ rating }}
+                            </span>
+                        {% empty %}
+                            <span class="text-muted">No ratings yet.</span>
+                        {% endfor %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p>No rating data yet – borrow and rate a few books first.</p>
+{% endif %}
+
+<h4>User similarity (current user vs others)</h4>
+<p class="text-muted">
+    This shows the raw cosine and jaccard similarity scores between your
+    profile and every other user profile in the ratings matrix.
+</p>
+
+{% if similarity_rows %}
+    <table class="table table-sm table-striped align-middle mb-4">
+        <thead>
+            <tr>
+                <th>Other user</th>
+                <th>Cosine similarity</th>
+                <th>Jaccard similarity</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in similarity_rows %}
+                <tr>
+                    <td>{{ row.user }}</td>
+                    <td>{{ row.cosine|floatformat:3 }}</td>
+                    <td>{{ row.jaccard|floatformat:3 }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="text-muted">Not enough users with ratings yet to compute similarities.</p>
+{% endif %}
+
+<hr>
+
+<h4>Live run (current data)</h4>
+
+{% if live_results %}
+    <p>This compares runtime of <code>recommend_for_user()</code> on your ratings using different
+       similarity metrics.</p>
+
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <table class="table table-sm table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Runtime (ms)</th>
+                        <th>Recs returned</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in live_results %}
+                        <tr>
+                            <td>{{ row.metric }}</td>
+                            <td>{{ row.time_ms|floatformat:3 }}</td>
+                            <td>{{ row.count }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="col-md-6">
+            <canvas id="liveChart" height="140"></canvas>
+        </div>
+    </div>
+{% else %}
+    <p>You don't have any ratings yet, so a live runtime can't be measured. Borrow and rate a few books first.</p>
+{% endif %}
+
+<hr>
+
+<h4>Simulation benchmarks: cosine vs jaccard (time)</h4>
+<p class="text-muted">
+    Below we generate random rating matrices of different sizes and measure how long
+    <code>recommend_for_user()</code> takes for user U0 using cosine and jaccard similarity.
+    This gives an empirical view of how runtime grows with problem size.
+</p>
+
+<div class="mb-3">
+    <canvas id="benchChart" height="160"></canvas>
+</div>
+
+<hr>
+
+<h4>k-neighbour sensitivity (cosine, live data)</h4>
+<p class="text-muted">
+    Here we vary <code>k</code> (the number of nearest neighbours used) for your account using cosine
+    similarity and measure how runtime and number of recommendations change.
+</p>
+
+{% if k_rows %}
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <table class="table table-sm table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>k neighbours</th>
+                        <th>Runtime (ms)</th>
+                        <th>Recs returned</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in k_rows %}
+                        <tr>
+                            <td>{{ row.k }}</td>
+                            <td>{{ row.time_ms|floatformat:3 }}</td>
+                            <td>{{ row.count }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <canvas id="kTimeChart" height="160"></canvas>
+    </div>
+    <div class="col-md-6">
+        <canvas id="kCountChart" height="160"></canvas>
+    </div>
+</div>
+
+<script>
+  // --- Live bar chart (cosine vs jaccard) ---
+  {% if live_results %}
+  const liveLabels = [{% for row in live_results %}"{{ row.metric }}"{% if not forloop.last %}, {% endif %}{% endfor %}];
+  const liveTimes = [{% for row in live_results %}{{ row.time_ms|floatformat:3 }}{% if not forloop.last %}, {% endif %}{% endfor %}];
+
+  const liveCtx = document.getElementById('liveChart').getContext('2d');
+  new Chart(liveCtx, {
+      type: 'bar',
+      data: {
+          labels: liveLabels,
+          datasets: [{
+              label: 'Runtime (ms)',
+              data: liveTimes,
+          }]
+      },
+      options: {
+          responsive: true,
+          plugins: {
+              legend: { display: false },
+          },
+          animation: {
+              duration: 800
+          },
+          scales: {
+              x: {
+                  title: {
+                      display: true,
+                      text: 'Similarity metric'
+                  }
+              },
+              y: {
+                  beginAtZero: true,
+                  title: {
+                      display: true,
+                      text: 'Runtime (ms)'
+                  }
+              }
+          }
+      }
+  });
+  {% endif %}
+
+  // --- Benchmark line chart (cosine vs jaccard) ---
+  const benchLabels = [{% for lbl in bench_labels %}"{{ lbl }}"{% if not forloop.last %}, {% endif %}{% endfor %}];
+  const benchCosine = [{% for t in bench_cosine %}{{ t|floatformat:3 }}{% if not forloop.last %}, {% endif %}{% endfor %}];
+  const benchJaccard = [{% for t in bench_jaccard %}{{ t|floatformat:3 }}{% if not forloop.last %}, {% endif %}{% endfor %}];
+
+  const benchCtx = document.getElementById('benchChart').getContext('2d');
+  new Chart(benchCtx, {
+      type: 'line',
+      data: {
+          labels: benchLabels,
+          datasets: [
+              {
+                  label: 'Cosine (ms)',
+                  data: benchCosine,
+              },
+              {
+                  label: 'Jaccard (ms)',
+                  data: benchJaccard,
+              }
+          ]
+      },
+      options: {
+          responsive: true,
+          interaction: {
+              mode: 'index',
+              intersect: false,
+          },
+          animation: {
+              duration: 800
+          },
+          scales: {
+              x: {
+                  title: {
+                      display: true,
+                      text: 'Problem size (users × books)'
+                  }
+              },
+              y: {
+                  beginAtZero: true,
+                  title: {
+                      display: true,
+                      text: 'Runtime (ms)'
+                  }
+              }
+          }
+      }
+  });
+
+  // --- k-neighbour charts (cosine, live data) ---
+  const kLabels = [{% for k in k_labels %}"{{ k }}"{% if not forloop.last %}, {% endif %}{% endfor %}];
+  const kTimes = [{% for t in k_times %}{{ t|floatformat:3 }}{% if not forloop.last %}, {% endif %}{% endfor %}];
+  const kCounts = [{% for c in k_counts %}{{ c }}{% if not forloop.last %}, {% endif %}{% endfor %}];
+
+  const kTimeCtx = document.getElementById('kTimeChart').getContext('2d');
+  new Chart(kTimeCtx, {
+      type: 'line',
+      data: {
+          labels: kLabels,
+          datasets: [
+              {
+                  label: 'Runtime (ms)',
+                  data: kTimes,
+              }
+          ]
+      },
+      options: {
+          responsive: true,
+          animation: {
+              duration: 800
+          },
+          scales: {
+              x: {
+                  title: {
+                      display: true,
+                      text: 'k neighbours'
+                  }
+              },
+              y: {
+                  beginAtZero: true,
+                  title: {
+                      display: true,
+                      text: 'Runtime (ms)'
+                  }
+              }
+          }
+      }
+  });
+
+  const kCountCtx = document.getElementById('kCountChart').getContext('2d');
+  new Chart(kCountCtx, {
+      type: 'line',
+      data: {
+          labels: kLabels,
+          datasets: [
+              {
+                  label: '# recommendations',
+                  data: kCounts,
+              }
+          ]
+      },
+      options: {
+          responsive: true,
+          animation: {
+              duration: 800
+          },
+          scales: {
+              x: {
+                  title: {
+                      display: true,
+                      text: 'k neighbours'
+                  }
+              },
+              y: {
+                  beginAtZero: true,
+                  title: {
+                      display: true,
+                      text: 'Recommendations returned'
+                  }
+              }
+          }
+      }
+  });
+</script>
+
+{% endblock %}
